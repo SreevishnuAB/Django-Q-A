@@ -1,0 +1,89 @@
+{% extends "base.html" %}
+
+{% block title %}Home{% endblock %}
+
+{% block content %}
+<script>
+    function deleteQuestion(event) {
+        console.log(event.target.name);
+        res = fetch("/questions/" + event.target.name, {
+            method: "DELETE",
+            headers: {
+                "X-CSRFToken": "{{ csrf_token }}"
+            }
+        }).then(response => {
+            if (response.ok) {
+                console.log("Question deleted successfully.");
+                document.getElementById("question-" + event.target.name).remove();
+            } else {
+                alert("Failed to delete the question.");
+            }
+        });
+    }
+
+    function deleteAnswer(event) {
+        const [question_id, answer_id] = event.target.name.split("_");
+        res = fetch(`/questions/${question_id}/answers/${answer_id}` , {
+            method: "DELETE",
+            headers: {
+                "X-CSRFToken": "{{ csrf_token }}"
+            }
+        }).then(response => {
+            if (response.ok) {
+                console.log("Answer deleted successfully.");
+                document.getElementById(`answer-${event.target.name}`).remove();
+            } else {
+                alert("Failed to delete the question.");
+            }
+        });
+    }
+</script>
+{% if user.is_authenticated %}
+<form action="/questions/" method="post">
+    {% csrf_token %}
+    <label for="question">Ask a question:</label>
+    <input type="text" id="question" name="question_text" required>
+    <button type="submit">Submit</button>
+</form>
+<form action="{% url 'logout' %}" method="post">
+    {% csrf_token %}
+    <button type="submit">Log Out</button>
+</form>
+{% for question in questions %}
+<div id="question-{{question.id}}">
+<h2>{{question.question_text}}</h2>
+<h3>Asked by {{question.created_by.username}} on {{question.created_at}}</h3>
+{% if question.created_by == user %}
+<button name="{{question.id}}" onclick="deleteQuestion(event)">Delete</button>
+{% endif %}
+<ul>
+{% for answer in question.answer_set.all %}
+    <li id="answer-{{question.id}}_{{answer.id}}">{{ answer.answer_text }} ({{answer.created_by}}) [{{answer.like_set.count}} likes]
+    <br>
+    {% if answer.created_by == user %}
+    <button name="{{question.id}}_{{answer.id}}" onclick="deleteAnswer(event)">Delete</button>
+    {% elif user not in answer.like_set.all  %}
+    <form action="/questions/{{question.id}}/answers/{{answer.id}}/like" method="post">
+        {% csrf_token %}
+        <button type="submit">Like</button>
+    </form>
+    {% else %}
+    <button name="{{question.id}}_{{answer.id}}" onclick="deleteAnswer(event)">Unlike</button>
+    {% endif %}
+    </li>
+{% endfor %}
+</ul>
+{% if question %}
+<form name={{question.id}} action="/questions/{{question.id}}/answers" method="post">
+    {% csrf_token %}
+    <textarea name="answer_text" rows="4" cols="50" placeholder="Type your answer here..."></textarea>
+    <button type="submit">Submit Answer</button>
+</form>
+{% endif %}
+</div>
+{% endfor %}
+{% else %}
+<p>You are not logged in</p>
+<a href="{% url 'login' %}">Log In</a>
+{% endif %}
+{% endblock %}
